@@ -14,6 +14,7 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import static android.media.AudioManager.AUDIO_SESSION_ID_GENERATE;
+import static java.lang.Thread.sleep;
 
 /**
  * Created by wangzhanfei on 17-12-1.
@@ -42,7 +43,7 @@ public class AudioTrackManager {
                         .setSampleRate(22050)
                         .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
                         .build(),
-                mAudioMinBufSize * 2,
+                mAudioMinBufSize*4,
                 AudioTrack.MODE_STREAM,
                 AUDIO_SESSION_ID_GENERATE
         );
@@ -72,7 +73,7 @@ public class AudioTrackManager {
             isStart = false;
             if (null != recordThread && Thread.State.RUNNABLE == recordThread.getState()) {
                 try {
-                    Thread.sleep(500);
+                    sleep(500);
                     recordThread.interrupt();
                 } catch (Exception e) {
                     recordThread = null;
@@ -130,50 +131,26 @@ public class AudioTrackManager {
         public void run() {
             try {
                 android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO);
-                byte[] tempBuffer = new byte[mAudioMinBufSize];
                 short[] shortBuffer = new short[(mAudioMinBufSize+1)/2];
-                int readCount = 0;
-                short readValue;
-                Log.d(TAG, "run: " + dis.available());
                 mAudioTrack.play();
-                while (dis.available() > 0) {
-                    readCount = dis.read(tempBuffer, 0, mAudioMinBufSize);
-                    Log.d(TAG, "read buffer: " + readCount);
-                    if (readCount == AudioTrack.ERROR_INVALID_OPERATION || readCount == AudioTrack.ERROR_BAD_VALUE) {
+                while (true) {
+                    if (queue.isEmpty()) {
                         continue;
                     }
-                    if (readCount != 0 && readCount != -1) {
-                        toBigdianShort(tempBuffer, shortBuffer);
-                        Log.e(TAG, "short buffer: " + shortBuffer.length);
+                    try {
+                        byte[] buffer = queue.poll();
+                        toBigdianShort(buffer, shortBuffer);
+//                        calc1(shortBuffer,0, (mAudioMinBufSize+1)/2);
                         Log.d(TAG, "write buffer: " + mAudioTrack.write(shortBuffer, 0, shortBuffer.length, AudioTrack.WRITE_BLOCKING));
                     }
-                    else {
-
+                    catch (Exception e) {
+                        e.printStackTrace();
+                        break;
                     }
-                    readCount = 0;
+
                 }
-
-
-//                int readCount = 1;
-//                int offset = 0;
-////                mAudioTrack.play();
-//                while(true) {
-//                    short[] tmpBuffer = new short[mAudioMinBufSize];
-//                    Log.d(TAG, "run: "+ (readCount = read_Short(tmpBuffer)));
-//                    if (readCount == AudioTrack.ERROR_INVALID_OPERATION || readCount == AudioTrack.ERROR_BAD_VALUE) {
-//                        Log.e(TAG, "run: write break!");
-//                        break;
-//                    }
-//                    if (readCount > 0) {
-//                        Log.d(TAG, "write: " + mAudioTrack.write(tmpBuffer, 0, readCount , AudioTrack.WRITE_BLOCKING));
-////                        offset += mAudioMinBufSize;
-//                    }
-//                    else {
-////                        mAudioTrack.stop();
-////                        mAudioTrack.release();
-//                        break;
-//                    }
-//                }
+                mAudioTrack.stop();
+                mAudioTrack.release();
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -281,6 +258,20 @@ public class AudioTrackManager {
             }
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    /**
+     *  消除噪音
+     * @param buffer input short[]
+     * @param offset offset in array
+     * @param len length
+     */
+    private void calc1(short[] buffer,int offset,int len) {
+        int i,j;
+        for (i = 0; i < len; i++) {
+            j = buffer[i+offset];
+            buffer[i+offset] = (short)(j>>2);
         }
     }
 
