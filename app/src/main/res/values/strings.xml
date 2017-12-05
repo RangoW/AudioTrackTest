@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">AudioTrackTest</string>
+
+    <string name="Play"> btn_play</string>
+    <string name="Pause">btn_Pause</string>
+</resources>
